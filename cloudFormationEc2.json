@@ -1,0 +1,764 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Cloud formation to create the following 4 EC2 instances, 2 security groups for ELB and EC2.",
+    "Parameters": {
+        "KeyName": {
+            "Description": "EC2 KeyPair to enable SSH access to the instance",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+        },
+        "InstanceType": {
+            "Description": "WebServer EC2 instance type",
+            "Type": "String",
+            "Default": "t2.micro",
+            "AllowedValues": [
+                "t2.micro"
+            ],
+            "ConstraintDescription": "must be a valid EC2 instance type."
+        },
+        "SSHLocation": {
+            "Description": "Range of IP addresses that we can use to SSH to the EC2 instances",
+            "Type": "String",
+            "MinLength": 9,
+            "MaxLength": 18,
+            "Default": "0.0.0.0/0",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+        },
+        "LatestAmiId": {
+            "Type": "String",
+            "Default": "ami-09e67e426f25ce0d7"
+        },
+        "SubNetId1": {
+            "Description": "First SubNet id 1",
+            "Type": "String"
+        },
+        "SubNetId2": {
+            "Description": "Second SubNet id 2",
+            "Type": "String"
+        },
+        "SubNetId3": {
+            "Description": "SubNet id 3",
+            "Type": "String"
+        },
+        "SubNetId4": {
+            "Description": "SubNet id 4",
+            "Type": "String"
+        },
+        "VPCId": {
+            "Description": "vpc id",
+            "Type": "String"
+        },
+        "VPCcidr": {
+            "Description": "vpc cidr",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "LiveInstanceNodes": {
+            "Type": "AWS::DynamoDB::Table",
+            "Properties": {
+                "TableName": "LiveInstanceNodes",
+                "AttributeDefinitions": [
+                    {
+                        "AttributeName": "ip",
+                        "AttributeType": "S"
+                    },
+                    {
+                        "AttributeName": "lastAlive",
+                        "AttributeType": "N"
+                    }
+                ],
+                "KeySchema": [
+                    {
+                        "AttributeName": "ip",
+                        "KeyType": "HASH"
+                    }
+                ],
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": "5",
+                    "WriteCapacityUnits": "5"
+                },
+                "GlobalSecondaryIndexes": [
+                    {
+                        "IndexName": "gsiCaseCountTable",
+                        "KeySchema": [
+                            {
+                                "AttributeName": "lastAlive",
+                                "KeyType": "HASH"
+                            }
+                        ],
+                        "Projection": {
+                            "ProjectionType": "ALL"
+                        },
+                        "ProvisionedThroughput": {
+                            "ReadCapacityUnits": "5",
+                            "WriteCapacityUnits": "5"
+                        }
+                    }
+                ]
+            },
+            "DependsOn": [
+                "DynamoDBQueryPolicy"
+            ],
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "bcf4decd-2b82-4411-bd26-b9309d98be1e"
+                }
+            }
+        },
+        "DynamoDBQueryPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "DynamoDBQueryPolicy",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "dynamodb:*",
+                            "Resource": "*"
+                        }
+                    ]
+                },
+                "Roles": [
+                    {
+                        "Ref": "TableRole"
+                    }
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "92fe2a55-8928-45fd-93f4-7b3ed968c774"
+                }
+            }
+        },
+        "TableRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "dynamodb.amazonaws.com",
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "6a319c50-e019-4a35-9290-7db78b5c4c6b"
+                }
+            }
+        },
+        "MyInstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "TableRole"
+                    }
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "821b0891-4fcc-424a-a57c-ea95f73fbfbd"
+                }
+            }
+        },
+        "InstanceSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Enable SSH access via port 22 and http access",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 22,
+                        "ToPort": 22,
+                        "CidrIp": {
+                            "Ref": "SSHLocation"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 8080,
+                        "ToPort": 8080,
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "91adb621-eb7e-4613-bcb7-0b8e22068770"
+                }
+            }
+        },
+        "EC2Instance1": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": {
+                    "Ref": "InstanceType"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "InstanceSecurityGroup"
+                    }
+                ],
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "ImageId": {
+                    "Ref": "LatestAmiId"
+                },
+                "IamInstanceProfile": {
+                    "Ref": "MyInstanceProfile"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Sub": "#!/bin/bash # Workaround consistency rules in AWS roles after creation... (sleep 10) sleep 10 echo \"Starting setup...\" sudo apt -f install sudo apt -y update && sudo apt -y dist-upgrade sudo apt install git sudo apt -y install python3-pip sudo apt-get install python3-flask -y sudo apt -y install build-essential libssl-dev libffi-dev python3-dev pip3 install xxhash pip3 install boto3 cd /home/ubuntu git clone https://github.com/Sam-M-Israel/Cloud-Computing-Assignment-2.git echo \"Successfully cloned github code...\" cd cloud-computing pip3 install -r requirements.txt && pip3 freeze > requirements.txt python3 app.py\n"
+                    }
+                }
+            },
+            "DependsOn": [
+                "TableRole"
+            ],
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "1a352899-1be9-4b8b-944c-4c12f1791334"
+                }
+            }
+        },
+        "EC2Instance2": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": {
+                    "Ref": "InstanceType"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "InstanceSecurityGroup"
+                    }
+                ],
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "ImageId": {
+                    "Ref": "LatestAmiId"
+                },
+                "IamInstanceProfile": {
+                    "Ref": "MyInstanceProfile"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Sub": "#!/bin/bash # Workaround consistency rules in AWS roles after creation... (sleep 10) sleep 10 echo \"Starting setup...\" sudo apt -f install sudo apt -y update && sudo apt -y dist-upgrade sudo apt install git sudo apt -y install python3-pip sudo apt-get install python3-flask -y sudo apt -y install build-essential libssl-dev libffi-dev python3-dev pip3 install xxhash pip3 install boto3 cd /home/ubuntu git clone https://github.com/Sam-M-Israel/Cloud-Computing-Assignment-2.git echo \"Successfully cloned github code...\" cd cloud-computing pip3 install -r requirements.txt && pip3 freeze > requirements.txt python3 app.py\n"
+                    }
+                }
+            },
+            "DependsOn": [
+                "TableRole"
+            ],
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "d5d09d30-b7b5-43a3-9bc6-291793e570cc"
+                }
+            }
+        },
+        "EC2Instance3": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": {
+                    "Ref": "InstanceType"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "InstanceSecurityGroup"
+                    }
+                ],
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "ImageId": {
+                    "Ref": "LatestAmiId"
+                },
+                "IamInstanceProfile": {
+                    "Ref": "MyInstanceProfile"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Sub": "#!/bin/bash # Workaround consistency rules in AWS roles after creation... (sleep 10) sleep 10 echo \"Starting setup...\" sudo apt -f install sudo apt -y update && sudo apt -y dist-upgrade sudo apt install git sudo apt -y install python3-pip sudo apt-get install python3-flask -y sudo apt -y install build-essential libssl-dev libffi-dev python3-dev pip3 install xxhash pip3 install boto3 cd /home/ubuntu git clone https://github.com/Sam-M-Israel/Cloud-Computing-Assignment-2.git echo \"Successfully cloned github code...\" cd cloud-computing pip3 install -r requirements.txt && pip3 freeze > requirements.txt python3 app.py\n"
+                    }
+                }
+            },
+            "DependsOn": [
+                "TableRole"
+            ],
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "51105031-19c0-40a1-821d-af29975b9c91"
+                }
+            }
+        },
+        "EC2Instance4": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": {
+                    "Ref": "InstanceType"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "InstanceSecurityGroup"
+                    }
+                ],
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "ImageId": {
+                    "Ref": "LatestAmiId"
+                },
+                "IamInstanceProfile": {
+                    "Ref": "MyInstanceProfile"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Sub": "#!/bin/bash # Workaround consistency rules in AWS roles after creation... (sleep 10) sleep 10 echo \"Starting setup...\" sudo apt -f install sudo apt -y update && sudo apt -y dist-upgrade sudo apt install git sudo apt -y install python3-pip sudo apt-get install python3-flask -y sudo apt -y install build-essential libssl-dev libffi-dev python3-dev pip3 install xxhash pip3 install boto3 cd /home/ubuntu git clone https://github.com/Sam-M-Israel/Cloud-Computing-Assignment-2.git echo \"Successfully cloned github code...\" cd cloud-computing pip3 install -r requirements.txt && pip3 freeze > requirements.txt python3 app.py\n"
+                    }
+                }
+            },
+            "DependsOn": [
+                "TableRole"
+            ],
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "b2a2123c-4a0e-48fc-adfc-8b0d80070373"
+                }
+            }
+        },
+        "ELBSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Enable SSH access via port 22 and http access port 80",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 22,
+                        "ToPort": 22,
+                        "CidrIp": {
+                            "Ref": "SSHLocation"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": 80,
+                        "ToPort": 80,
+                        "CidrIp": {
+                            "Ref": "SSHLocation"
+                        }
+                    }
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "acc279d5-ca4a-4d84-a3e7-8a07311d1390"
+                }
+            }
+        },
+        "ElasticLoadBalancer": {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "Name": "SamOmerELB",
+                "IpAddressType": "ipv4",
+                "Scheme": "internet-facing",
+                "SecurityGroups": [
+                    {
+                        "Fn::GetAtt": [
+                            "ELBSecurityGroup",
+                            "GroupId"
+                        ]
+                    }
+                ],
+                "Subnets": [
+                    {
+                        "Ref": "SubNetId1"
+                    },
+                    {
+                        "Ref": "SubNetId2"
+                    },
+                    {
+                        "Ref": "SubNetId3"
+                    },
+                    {
+                        "Ref": "SubNetId4"
+                    }
+                ],
+                "Type": "application"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "b7c74172-4d32-4240-8787-c3845dfdf883"
+                }
+            }
+        },
+        "ELBTargetGroup": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties": {
+                "HealthCheckEnabled": true,
+                "HealthCheckIntervalSeconds": 10,
+                "HealthCheckPath": "/health-check",
+                "HealthCheckPort": 8080,
+                "HealthCheckProtocol": "HTTP",
+                "HealthCheckTimeoutSeconds": 5,
+                "HealthyThresholdCount": 2,
+                "Matcher": {
+                    "HttpCode": "200,302"
+                },
+                "Name": "SamOmerTargetGroup",
+                "Port": 80,
+                "Protocol": "HTTP",
+                "Targets": [
+                    {
+                        "Id": {
+                            "Ref": "EC2Instance1"
+                        },
+                        "Port": 8080
+                    },
+                    {
+                        "Id": {
+                            "Ref": "EC2Instance2"
+                        },
+                        "Port": 8080
+                    },
+                    {
+                        "Id": {
+                            "Ref": "EC2Instance3"
+                        },
+                        "Port": 8080
+                    },
+                    {
+                        "Id": {
+                            "Ref": "EC2Instance4"
+                        },
+                        "Port": 8080
+                    }
+                ],
+                "TargetType": "instance",
+                "UnhealthyThresholdCount": 2,
+                "VpcId": {
+                    "Ref": "VPCId"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "6fc7e6f4-1260-4b72-b4db-a22a02d11bf7"
+                }
+            }
+        },
+        "ELBListener": {
+            "Type": "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties": {
+                "DefaultActions": [
+                    {
+                        "Type": "forward",
+                        "TargetGroupArn": {
+                            "Ref": "ELBTargetGroup"
+                        },
+                        "Order": 100
+                    }
+                ],
+                "LoadBalancerArn": {
+                    "Ref": "ElasticLoadBalancer"
+                },
+                "Port": 80,
+                "Protocol": "HTTP"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "4eaeb56d-7a5a-4d04-9fa0-f98a773e9c4b"
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "InstanceId1": {
+            "Description": "InstanceId of EC2Instance1",
+            "Value": {
+                "Ref": "EC2Instance1"
+            }
+        },
+        "Instance1IP": {
+            "Description": "IP address of EC2Instance1",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance1",
+                    "PublicIp"
+                ]
+            }
+        },
+        "InstanceId2": {
+            "Description": "InstanceId of EC2Instance2",
+            "Value": {
+                "Ref": "EC2Instance2"
+            }
+        },
+        "Instance2IP": {
+            "Description": "IP address of EC2Instance2",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance2",
+                    "PublicIp"
+                ]
+            }
+        },
+        "InstanceId3": {
+            "Description": "InstanceId of EC2Instance3",
+            "Value": {
+                "Ref": "EC2Instance3"
+            }
+        },
+        "Instance3IP": {
+            "Description": "IP address of EC2Instance3",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance3",
+                    "PublicIp"
+                ]
+            }
+        },
+        "InstanceId4": {
+            "Description": "InstanceId of EC2Instance4",
+            "Value": {
+                "Ref": "EC2Instance4"
+            }
+        },
+        "Instance4IP": {
+            "Description": "IP address of EC2Instance4",
+            "Value": {
+                "Fn::GetAtt": [
+                    "EC2Instance4",
+                    "PublicIp"
+                ]
+            }
+        },
+        "TargetGroup": {
+            "Description": "Target group of the EC2 instances",
+            "Value": {
+                "Ref": "ELBTargetGroup"
+            }
+        },
+        "LoadBalancer": {
+            "Description": "Elastic Load Balancer",
+            "Value": {
+                "Ref": "ElasticLoadBalancer"
+            }
+        }
+    },
+    "Metadata": {
+        "AWS::CloudFormation::Designer": {
+            "acc279d5-ca4a-4d84-a3e7-8a07311d1390": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 60,
+                    "y": 90
+                },
+                "z": 1,
+                "embeds": []
+            },
+            "b7c74172-4d32-4240-8787-c3845dfdf883": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 180,
+                    "y": 90
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "acc279d5-ca4a-4d84-a3e7-8a07311d1390"
+                ]
+            },
+            "91adb621-eb7e-4613-bcb7-0b8e22068770": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 60,
+                    "y": 210
+                },
+                "z": 1,
+                "embeds": []
+            },
+            "6a319c50-e019-4a35-9290-7db78b5c4c6b": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 180,
+                    "y": 210
+                },
+                "z": 1,
+                "embeds": []
+            },
+            "821b0891-4fcc-424a-a57c-ea95f73fbfbd": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 300,
+                    "y": 90
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "6a319c50-e019-4a35-9290-7db78b5c4c6b"
+                ]
+            },
+            "b2a2123c-4a0e-48fc-adfc-8b0d80070373": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 300,
+                    "y": 210
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "91adb621-eb7e-4613-bcb7-0b8e22068770"
+                ],
+                "dependson": [
+                    "6a319c50-e019-4a35-9290-7db78b5c4c6b"
+                ]
+            },
+            "51105031-19c0-40a1-821d-af29975b9c91": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 60,
+                    "y": 330
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "91adb621-eb7e-4613-bcb7-0b8e22068770"
+                ],
+                "dependson": [
+                    "6a319c50-e019-4a35-9290-7db78b5c4c6b"
+                ]
+            },
+            "d5d09d30-b7b5-43a3-9bc6-291793e570cc": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 180,
+                    "y": 330
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "91adb621-eb7e-4613-bcb7-0b8e22068770"
+                ],
+                "dependson": [
+                    "6a319c50-e019-4a35-9290-7db78b5c4c6b"
+                ]
+            },
+            "1a352899-1be9-4b8b-944c-4c12f1791334": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 300,
+                    "y": 330
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "91adb621-eb7e-4613-bcb7-0b8e22068770"
+                ],
+                "dependson": [
+                    "6a319c50-e019-4a35-9290-7db78b5c4c6b"
+                ]
+            },
+            "6fc7e6f4-1260-4b72-b4db-a22a02d11bf7": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 420,
+                    "y": 90
+                },
+                "z": 1,
+                "embeds": []
+            },
+            "4eaeb56d-7a5a-4d04-9fa0-f98a773e9c4b": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 420,
+                    "y": 210
+                },
+                "z": 1,
+                "embeds": []
+            },
+            "92fe2a55-8928-45fd-93f4-7b3ed968c774": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 420,
+                    "y": 330
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "6a319c50-e019-4a35-9290-7db78b5c4c6b"
+                ]
+            },
+            "bcf4decd-2b82-4411-bd26-b9309d98be1e": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 60,
+                    "y": 450
+                },
+                "z": 1,
+                "embeds": [],
+                "isassociatedwith": [
+                    "bcf4decd-2b82-4411-bd26-b9309d98be1e"
+                ],
+                "dependson": [
+                    "92fe2a55-8928-45fd-93f4-7b3ed968c774"
+                ]
+            }
+        }
+    }
+}
