@@ -190,8 +190,8 @@ def get_target_and_alt_node_ips(key):
 
 @app.route('/health-check', methods=['GET', 'POST'])
 def health_check():
-    timestamp =  get_current_time()
-    return 200, f'{ip_address} reporting for duty at {timestamp}'
+    app.logger.info(f'{ip_address} node still alive')
+    return 200
 
 
 @app.route('/')
