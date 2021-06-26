@@ -151,6 +151,12 @@ def show_cache():
             {'status code': 400, 'item': f"Error: {e}"})
     return data
 
+@app.route('/api/show_me_the_living', methods=['GET','POST'])
+def get_live_nodes():
+    live_nodes_list = get_live_node_list()
+    return json.dumps(
+            {'status code': 200, 'item': live_nodes_list})
+
 
 def update_health_table():
     timestamp = get_current_time()
@@ -174,7 +180,7 @@ def get_target_node(key, nodes):
 
 def update_live_nodes():
     live_nodes_list = get_live_node_list()
-    for node_key in nodes_hash_ring.nodes():
+    for node_key in nodes_hash_ring.nodes:
         if node_key not in live_nodes_list:
             nodes_hash_ring.remove_node(node_key)
 
@@ -190,13 +196,19 @@ def get_target_and_alt_node_ips(key):
 
 @app.route('/health-check', methods=['GET', 'POST'])
 def health_check():
-    app.logger.info(f'{ip_address} node still alive')
+    time_stamp = update_health_table()
+    print(f'{ip_address} node still alive at {time_stamp}')
     return "200"
 
 
 @app.route('/')
 def hello_world():
     print(f'Here in hello world')
+    timestamp = get_current_time()
+    item = {'IP': ip_address,
+            'lastActiveTime': timestamp
+            }
+    table.put_item(Item=item)
     return 'Hello World!'
 
 
