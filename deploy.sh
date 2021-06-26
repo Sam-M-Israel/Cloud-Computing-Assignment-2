@@ -37,10 +37,7 @@ echo "VPC cidr block: $VPC_CIDRBLOCK"
 # Creating a cloud formation stack
 echo "Creating cloud formation stack "
 STACK_NAME="sam-omer-stack"
-STACK_RESULT=$(aws cloudformation create-stack \
-          --stack-name $STACK_NAME \
-          --template-body file://cloudFomationEc2.json \
-          --capabilities CAPABILITY_IAM \
+STACK_RESULT=$(aws cloudformation create-stack --stack-name $STACK_NAME --template-body file://cloudFormationEc2.json --capabilities CAPABILITY_IAM \
           --parameters ParameterKey=InstanceType,ParameterValue=t2.micro \
           ParameterKey=KeyName,ParameterValue=$KEY_NAME \
 	        ParameterKey=SSHLocation,ParameterValue=$MY_IP/32 \
@@ -64,15 +61,25 @@ echo $OUTPUTS
 
 echo "Getting EC2 instance IP's from stack: $STACK_NAME"
 Ec2_1_IP=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='EC2Node1IP'].OutputValue" --output text)
+Ec2_1_ID=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='EC2Node1ID'].OutputValue" --output text)
+
 Ec2_2_IP=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='EC2Node2IP'].OutputValue" --output text)
+Ec2_2_ID=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='EC2Node2ID'].OutputValue" --output text)
+
 Ec2_3_IP=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='EC2Node3IP'].OutputValue" --output text)
+Ec2_3_ID=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='EC2Node3ID'].OutputValue" --output text)
 STACK_TGROUP=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='TargetGroup'].OutputValue" --output text)
 
 echo "New instance at $Ec2_1_IP with subnet: $SUBNET_ID_1"
 echo "New instance at $Ec2_2_IP with subnet: $SUBNET_ID_2"
 echo "New instance at $Ec2_3_IP with subnet: $SUBNET_ID_3"
-echo "Waiting for instances to register as healthy"
-sleep 20
+echo "Waiting for instances to register as healthy..."
+aws ec2 wait instance-status-ok --instance-ids $Ec2_1_ID
+echo "$Ec2_1_ID registered as healthy"
+aws ec2 wait instance-status-ok --instance-ids $Ec2_2_ID
+echo "$Ec2_2_ID registered as healthy"
+aws ec2 wait instance-status-ok --instance-ids $Ec2_3_ID
+echo "$Ec2_3_ID registered as healthy"
 
 # Target Health check
 echo "Checking $STACK_TGROUP health"
