@@ -5,6 +5,7 @@ import requests
 import boto3
 from uhashring import HashRing
 from ec2_node.ec2Node import Ec2Node
+from ec2_node.nodeHashRing import NodeHashRing
 
 ec2_node = Ec2Node(8080)
 
@@ -28,7 +29,8 @@ def get_live_node_list() -> []:
 dynamodb = boto3.resource('dynamodb', region_name="us-east-2")
 table = dynamodb.Table('ActiveNodes')
 app = Flask(__name__)
-nodes_hash_ring = HashRing(nodes=get_live_node_list())
+nodes_hash_ring = NodeHashRing(table, app.logger)
+# nodes_hash_ring = HashRing(nodes=get_live_node_list())
 
 
 # TODO:
@@ -51,15 +53,9 @@ def get():
     get(str_key) → null or data
     :return: null or data
     """
-    live_nodes = get_live_node_list()
-    num_live_nodes = len(live_nodes)
-    print(f'Here in /get')
-    if num_live_nodes < 2:
-        app.logger.info(f'{num_live_nodes} nodes still alive')
-        # TODO: handle no live nodes
-
+    nodes_hash_ring.update_live_nodes()
     key = request.args.get('str_key')
-    node, alt_node = get_target_and_alt_node_ips(key)
+    node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips(key)
     try:
         ans = ec2_node.get_data_and_get_req(key, node)
     except requests.exceptions.ConnectionError:
@@ -77,16 +73,11 @@ def put():
     Main API entry point
     put (str_key, data, expiration_date)
     """
-    live_nodes = get_live_node_list()
-    num_live_nodes = len(live_nodes)
-    if num_live_nodes < 2:
-        app.logger.info(f'{num_live_nodes} nodes still alive')
-        # TODO: handle no live nodes
-
+    nodes_hash_ring.update_live_nodes()
     key = request.args.get('str_key')
     data = request.args.get('data')
     expiration_date = request.args.get('expiration_date')
-    node, alt_node = get_target_and_alt_node_ips(key)
+    node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips(key)
     try:
         ans = ec2_node.store_data_and_post_req(key, data, expiration_date, node)
     except requests.exceptions.ConnectionError:
@@ -151,9 +142,10 @@ def show_cache():
             {'status code': 400, 'item': f"Error: {e}"})
     return data
 
+
 @app.route('/api/show_me_the_living', methods=['GET','POST'])
 def get_live_nodes():
-    live_nodes_list = get_live_node_list()
+    live_nodes_list = nodes_hash_ring.get_live_node_list()
     return json.dumps(
             {'status code': 200, 'item': live_nodes_list})
 
@@ -173,25 +165,34 @@ def update_health_table():
     return timestamp
 
 
-def get_target_node(key, nodes):
-    hr = HashRing(nodes=nodes)
-    return hr.get_node(key)
-
-
-def update_live_nodes():
-    live_nodes_list = get_live_node_list()
-    for node_key in nodes_hash_ring.nodes:
-        if node_key not in live_nodes_list:
-            nodes_hash_ring.remove_node(node_key)
-
-
-def get_target_and_alt_node_ips(key):
-    update_live_nodes()
-    main_node = nodes_hash_ring.get_node(key)
-    nodes_hash_ring.remove_node(main_node)
-    alt_node = nodes_hash_ring.get_node(key)
-    nodes_hash_ring.add_node(main_node)
-    return main_node, alt_node
+# def get_target_node(key, nodes):
+#     hr = HashRing(nodes=nodes)
+#     return hr.get_node(key)
+#
+#
+# def update_live_nodes():
+#     live_nodes_list = get_live_node_list()
+#     remove_list = []
+#
+#     for node in live_nodes_list:
+#         if node not in nodes_hash_ring.get_nodes():
+#             nodes_hash_ring.add_node(node)
+#
+#     for node_key in nodes_hash_ring.get_nodes():
+#         if node_key not in live_nodes_list:
+#             remove_list.append(node_key)
+#
+#     for node_key in remove_list:
+#         nodes_hash_ring.remove_node(node_key)
+#
+#
+# def get_target_and_alt_node_ips(key):
+#     update_live_nodes()
+#     main_node = nodes_hash_ring.get_node(key)
+#     nodes_hash_ring.remove_node(main_node)
+#     alt_node = nodes_hash_ring.get_node(key)
+#     nodes_hash_ring.add_node(main_node)
+#     return main_node, alt_node
 
 
 @app.route('/health-check', methods=['GET', 'POST'])
@@ -209,6 +210,7 @@ def hello_world():
             'lastActiveTime': timestamp
             }
     table.put_item(Item=item)
+    nodes_hash_ring.update_live_nodes()
     return 'Hello World!'
 
 
