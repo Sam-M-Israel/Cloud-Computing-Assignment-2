@@ -18,7 +18,7 @@ def get_live_node_list() -> []:
         app.logger.info(f'Table scan response: {response}')
         live_nodes = [item['IP'] for item in response['Items'] if
                       float(item['lastActiveTime']) >= now - 60000]
-
+        print(live_nodes)
     except Exception as e:
         app.logger.info(f'Error in get_live_node_list: {e}')
 
@@ -215,5 +215,6 @@ def hello_world():
 if __name__ == '__main__':
     ip_address = requests.get('https://api.ipify.org').text
     ec2_node.ip = ip_address
+    update_health_table()
     app.logger.info(f'My public IP address is: {ip_address}')
     app.run(host='0.0.0.0', port=8080)
