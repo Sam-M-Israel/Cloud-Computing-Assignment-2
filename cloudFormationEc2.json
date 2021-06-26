@@ -63,10 +63,6 @@
                     {
                         "AttributeName": "lastActiveTime",
                         "AttributeType": "N"
-                    },
-                    {
-                        "AttributeName": "BackupLoadCarrier",
-                        "AttributeType": "S"
                     }
                 ],
                 "KeySchema": [

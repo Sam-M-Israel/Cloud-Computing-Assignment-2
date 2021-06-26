@@ -57,19 +57,18 @@ def get():
     if num_live_nodes < 2:
         app.logger.info(f'{num_live_nodes} nodes still alive')
         # TODO: handle no live nodes
-        return 200, None
-    else:
-        key = request.args.get('str_key')
-        node, alt_node = get_target_and_alt_node_ips(key)
+
+    key = request.args.get('str_key')
+    node, alt_node = get_target_and_alt_node_ips(key)
+    try:
+        ans = ec2_node.get_data_and_get_req(key, node)
+    except requests.exceptions.ConnectionError:
         try:
-            ans = ec2_node.get_data_and_get_req(key, node)
+            ans = ec2_node.get_data_and_get_req(key, alt_node)
         except requests.exceptions.ConnectionError:
-            try:
-                ans = ec2_node.get_data_and_get_req(key, alt_node)
-            except requests.exceptions.ConnectionError:
-                ans = json.dumps({'status_code': 404})
-        update_health_table()
-        return ans.json().get('item')
+            ans = json.dumps({'status_code': 404})
+    update_health_table()
+    return ans.json().get('item')
 
 
 @app.route('/put', methods=['GET', 'POST'])
@@ -80,34 +79,26 @@ def put():
     """
     live_nodes = get_live_node_list()
     num_live_nodes = len(live_nodes)
-    print(f'Here in /put')
     if num_live_nodes < 2:
         app.logger.info(f'{num_live_nodes} nodes still alive')
         # TODO: handle no live nodes
-        return 200, None
-    else:
-        key = request.args.get('str_key')
-        data = request.args.get('data')
-        expiration_date = request.args.get('expiration_date')
-        node, alt_node = get_target_and_alt_node_ips(key)
+
+    key = request.args.get('str_key')
+    data = request.args.get('data')
+    expiration_date = request.args.get('expiration_date')
+    node, alt_node = get_target_and_alt_node_ips(key)
+    try:
+        ans = ec2_node.store_data_and_post_req(key, data, expiration_date, node)
+    except requests.exceptions.ConnectionError:
         try:
-            ans = ec2_node.store_data_and_post_req(key, data, expiration_date, node)
+            ans = ec2_node.store_data_and_post_req(key, data, expiration_date, alt_node)
         except requests.exceptions.ConnectionError:
-            try:
-                ans = ec2_node.store_data_and_post_req(key, data, expiration_date, alt_node)
-            except requests.exceptions.ConnectionError:
-                ans = json.dumps({'status_code': 404})
-        update_health_table()
-        return ans.json()
+            ans = json.dumps({'status_code': 404})
+    update_health_table()
+    return ans.json()
 
 
 # API calls between all of the nodes in the distributed cache system. Ideally not accessible by the user
-
-
-@app.route('/api/health_check', methods=['GET', 'POST'])
-def health_check():
-    timestamp = update_health_table()
-    return f'{ip_address} reporting for duty at {timestamp}'
 
 
 @app.route('/api/get_val', methods=['GET'])
@@ -146,15 +137,30 @@ def set_value():
     return res
 
 
+@app.route('/api/print-cache', methods=['GET','POST'])
+def show_cache():
+    """
+    For Testing Purposes
+    :return:
+    """
+    try:
+        data = json.dumps(
+            {'status code': 200, 'item': ec2_node.get_cache()})
+    except Exception as e:
+        data = json.dumps(
+            {'status code': 400, 'item': f"Error: {e}"})
+    return data
+
+
 def update_health_table():
     timestamp = get_current_time()
     res = table.update_item(
         Key={
             'IP': ip_address
         },
-        UpdateExpression='SET lastActiveTime= :val1',
+        UpdateExpression='set lastActiveTime= :val1',
         ExpressionAttributeValues={
-            ':var1': timestamp,
+            ':val1': timestamp,
         }
     )
     app.logger.info(f'{res}')
@@ -182,6 +188,12 @@ def get_target_and_alt_node_ips(key):
     return main_node, alt_node
 
 
+@app.route('/health-check', methods=['GET', 'POST'])
+def health_check():
+    timestamp =  get_current_time()
+    return 200, f'{ip_address} reporting for duty at {timestamp}'
+
+
 @app.route('/')
 def hello_world():
     print(f'Here in hello world')
@@ -190,8 +202,6 @@ def hello_world():
 
 if __name__ == '__main__':
     ip_address = requests.get('https://api.ipify.org').text
-    # TODO: Delete the below the line
-    ip_address = "10.0.0.30"
     ec2_node.ip = ip_address
     app.logger.info(f'My public IP address is: {ip_address}')
     app.run(host='0.0.0.0', port=8080)
