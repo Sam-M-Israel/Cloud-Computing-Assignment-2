@@ -38,35 +38,35 @@ echo "VPC cidr block: $VPC_CIDRBLOCK"
 echo "Creating cloud formation stack "
 STACK_NAME="sam-omer-stack"
 STACK_RESULT=$(aws cloudformation create-stack \
-          --stack-name "$STACK_NAME" \
-          --template-body file://cloudFormationEc2.json \
+          --stack-name $STACK_NAME \
+          --template-body file://cloudFomationEc2.json \
           --capabilities CAPABILITY_IAM \
           --parameters ParameterKey=InstanceType,ParameterValue=t2.micro \
-          ParameterKey=KeyName,ParameterValue="$KEY_NAME" \
-	        ParameterKey=SSHLocation,ParameterValue="$MY_IP"/32 \
-          ParameterKey=SubnetID1,ParameterValue="$SUBNET_ID_1" \
-          ParameterKey=SubnetID2,ParameterValue="$SUBNET_ID_2" \
-          ParameterKey=SubnetID3,ParameterValue="$SUBNET_ID_3" \
-          ParameterKey=VPCId,ParameterValue="$VPC_ID" \
-          ParameterKey=VPCcidr,ParameterValue="$VPC_CIDRBLOCK")
+          ParameterKey=KeyName,ParameterValue=$KEY_NAME \
+	        ParameterKey=SSHLocation,ParameterValue=$MY_IP/32 \
+          ParameterKey=SubnetID1,ParameterValue=$SUBNET_ID_1 \
+          ParameterKey=SubnetID2,ParameterValue=$SUBNET_ID_2 \
+          ParameterKey=SubnetID3,ParameterValue=$SUBNET_ID_3 \
+          ParameterKey=VPCId,ParameterValue=$VPC_ID \
+          ParameterKey=VPCcidr,ParameterValue=$VPC_CIDRBLOCK)
 
 echo "Waiting for stack: $STACK_NAME to be created..."
-STACK_ID=$(echo "$STACK_RESULT" | jq -r '.StackId')
-aws cloudformation wait stack-create-complete --stack-name "$STACK_ID"
+STACK_ID=$(echo $STACK_RESULT | jq -r '.StackId')
+aws cloudformation wait stack-create-complete --stack-name $STACK_NAME
 
 # Getting the wanted stack
-STACK=$(aws cloudformation --region $REGION describe-stacks --stack-name "$STACK_NAME" | jq -r .Stacks[0])
+STACK=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME | jq -r .Stacks[0])
 
 # Printing the stack outputs
 echo "Printing $STACK_NAME outputs..."
-OUTPUTS=$(echo "$STACK" | jq -r .Outputs)
-echo "$OUTPUTS"
+OUTPUTS=$(echo $STACK | jq -r .Outputs)
+echo $OUTPUTS
 
 echo "Getting EC2 instance IP's from stack: $STACK_NAME"
-Ec2_1_IP=$(aws cloudformation --region $REGION describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='Instance1IP'].OutputValue" --output text)
-Ec2_2_IP=$(aws cloudformation --region $REGION describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='Instance2IP'].OutputValue" --output text)
-Ec2_3_IP=$(aws cloudformation --region $REGION describe-stacks --stack-name "$STACK_NAME" --query "Stacks[0].Outputs[?OutputKey=='Instance3IP'].OutputValue" --output text)
-STACK_TGROUP=$(aws cloudformation --region $REGION describe-stacks --stack-name shai-elad-stack --query "Stacks[0].Outputs[?OutputKey=='TargetGroup'].OutputValue" --output text)
+Ec2_1_IP=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='EC2Node1IP'].OutputValue" --output text)
+Ec2_2_IP=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='EC2Node2IP'].OutputValue" --output text)
+Ec2_3_IP=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='EC2Node3IP'].OutputValue" --output text)
+STACK_TGROUP=$(aws cloudformation --region $REGION describe-stacks --stack-name $STACK_NAME --query "Stacks[0].Outputs[?OutputKey=='TargetGroup'].OutputValue" --output text)
 
 echo "New instance at $Ec2_1_IP with subnet: $SUBNET_ID_1"
 echo "New instance at $Ec2_2_IP with subnet: $SUBNET_ID_2"
@@ -76,12 +76,12 @@ sleep 20
 
 # Target Health check
 echo "Checking $STACK_TGROUP health"
-T_HEALTH_CHECK=$(aws elbv2 describe-target-health --target-group-arn "$STACK_TGROUP")
+T_HEALTH_CHECK=$(aws elbv2 describe-target-health --target-group-arn $STACK_TGROUP)
 echo "$T_HEALTH_CHECK"
 
 ELB_NAME="SamOmerELB"
 echo "Getting DNS Name for ELB: $ELB_NAME"
-DNS_ADD=$(aws elbv2 describe-load-balancers --names "$ELB_NAME" | jq -r .LoadBalancers[0].DNSName)
+DNS_ADD=$(aws elbv2 describe-load-balancers --names $ELB_NAME | jq -r .LoadBalancers[0].DNSName)
 echo "$DNS_ADD"
 
 #echo "setup rule allowing SSH access to $MY_IP only"
