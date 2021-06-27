@@ -64,6 +64,11 @@ def get():
         except requests.exceptions.ConnectionError:
             ans = json.dumps({'status_code': 404})
     update_health_table()
+
+    if ans is None:
+        return json.dumps({'status_code': 200,
+                          'Invalid Key': f'Key, value pair for {key} doesn\"t exist in '
+                                        'any cache in system'})
     return ans.json().get('item')
 
 
@@ -123,8 +128,7 @@ def set_value():
         res = json.dumps({'status code': 200, 'item': store_res})
         update_health_table()
     except Exception as e:
-        res = json.dumps(
-            {'status code': 400, 'item': f"Error: {e}"})
+        res = json.dumps({'status code': 400, 'item': f"Error: {e}"})
     return res
 
 

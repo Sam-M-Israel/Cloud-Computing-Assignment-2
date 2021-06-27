@@ -27,9 +27,10 @@ class Ec2Node:
         try:
             res = requests.post(
                     f'http://{target_node_ip}:{self._vpc_port}/api/set_value?str_key={key}&data={data}&expiration_date={expiration_date}')
+            res = json.dumps({'status_code': 200, "item": res})
         except requests.exceptions.ConnectionError:
             res = json.dumps({'status_code': 404})
-        return res.json()
+        return res
 
     def get_from_target_node(self, key, target_node_ip):
         """
@@ -40,9 +41,10 @@ class Ec2Node:
         """
         try:
             res = requests.get(f'http://{target_node_ip}:{self._vpc_port}/api/get_value?str_key={key}')
+            res = json.dumps({'status_code': 200, "item": res})
         except requests.exceptions.ConnectionError:
             res = json.dumps({'status_code': 404})
-        return res.json()
+        return res
 
     def store_data_and_post_req(self, key, data, expiration_date, target_node_ip):
         """
@@ -57,7 +59,8 @@ class Ec2Node:
         if has_been_cached:
             res = self.post_to_target_node(key, data, expiration_date, target_node_ip)
         else:
-            res = f"Error storing {key} in THIS node's cache"
+            res = json.dumps({'status_code': 404,
+                              "error": f"Error storing {key} in THIS node's cache"})
 
         return res
 
@@ -72,8 +75,8 @@ class Ec2Node:
         if data_from_cache is None:
             res = self.get_from_target_node(key, target_node_ip)
         else:
-            res = f"Error storing {key} in THIS node's cache"
-
+            res = json.dumps({'status_code': 404,
+                              "error": f"Error getting {key} in THIS node's cache"})
         return res
 
     def store_data(self, key, data, expiration_date):
