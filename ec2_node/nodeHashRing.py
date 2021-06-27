@@ -10,7 +10,7 @@ class NodeHashRing:
         self.dynamo_table = db_table
         self.live_nodes = self.get_live_node_list()
         self.hash_ring = HashRing(nodes=self.live_nodes)
-        self.flask_logger = logger
+        # self.flask_logger = logger
         self._last_updated = 0
         self.get_current_time()
 
@@ -20,14 +20,14 @@ class NodeHashRing:
         :return:
         """
         try:
-            self.flask_logger.info('Here in get_live_node_list')
+            print('Here in get_live_node_list')
             response = self.dynamo_table.scan()
-            self.flask_logger.info(f'Table scan response: {response}')
+            print(f'Table scan response: {response}')
             self.get_current_time()
             self.live_nodes = [item['IP'] for item in response['Items'] if
                           float(item['lastActiveTime']) >= self._last_updated - 60000]
         except Exception as e:
-            self.flask_logger.info(f'Error in get_live_node_list: {e}')
+            print(f'Error in get_live_node_list: {e}')
 
         return self.live_nodes
 
