@@ -6,6 +6,7 @@ class NodeHashRing:
     """
     Our Hash ring object
     """
+
     def __init__(self, db_table):
         self.dynamo_table = db_table
         self.num_live_nodes = 0
@@ -24,10 +25,13 @@ class NodeHashRing:
         do_backup = False
         try:
             response = self.dynamo_table.scan()
-            self.get_current_time()
+            now = self.get_current_time()
             self.live_nodes = [item['IP'] for item in response['Items'] if
-                          float(item['lastActiveTime']) >= self._last_updated - 60000]
-
+                               int(item['lastActiveTime']) >= now - 15000]
+            print(self.live_nodes)
+            dead_nodes_check = [item['IP'] for item in response['Items'] if
+                               int(item['lastActiveTime']) < now - 15000]
+            print(dead_nodes_check)
             if self.num_difference_in_nodes() > 0:
                 self.set_num_live_and_prev_nodes(len(self.live_nodes))
                 do_backup = True
@@ -73,7 +77,7 @@ class NodeHashRing:
                 self.hash_ring.remove_node(node_key)
 
     def get_current_time(self):
-        self._last_updated = round(datetime.now().timestamp())
+        self._last_updated = int(round(datetime.now().timestamp()) * 1000)
         return self._last_updated
 
     def to_string(self):

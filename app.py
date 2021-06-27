@@ -22,8 +22,9 @@ nodes_hash_ring = NodeHashRing(table)
 # Functions:
 # 1. Storing data in this nodes cache
 
+
 def get_current_time():
-    return int(round(datetime.now().timestamp()))
+    return int(round(datetime.now().timestamp())*1000)
 
 
 @app.route('/get', methods=['GET'])
