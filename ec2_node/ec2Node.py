@@ -98,15 +98,16 @@ class Ec2Node:
     def backup_main_cache(self, start_node_ip, num_nodes_in_ring):
         try:
             full_cache = self.cache.get_full_cache()
-            data = {}
             if full_cache != {}:
                 data = json.dumps(full_cache)
-            res = requests.post(
-                f'http://{self.secondary_node}:'
-                f'{self._vpc_port}/api/backup?start_node='
-                f'{start_node_ip}&nodes_to_backup={num_nodes_in_ring}',
-                json=data)
-            res = json.load()
+                res = requests.post(
+                    f'http://{self.secondary_node}:'
+                    f'{self._vpc_port}/api/backup?start_node='
+                    f'{start_node_ip}&nodes_to_backup={num_nodes_in_ring}',
+                    json=data)
+                res = res.json()
+            else:
+                res = json.dumps({'status_code': 200, "item":"Backup cachce is empty"})
         except requests.exceptions.ConnectionError:
             res = json.dumps({'status_code': 404})
         return res

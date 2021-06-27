@@ -66,6 +66,16 @@ def put():
     data = request.args.get('data')
     expiration_date = request.args.get('expiration_date')
     node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips(key)
+    if node == ec2_node.ip:
+        nodes_hash_ring.hash_ring.remove_node(node)
+        new_main = nodes_hash_ring.hash_ring.get_node(key)
+        nodes_hash_ring.hash_ring.remove_node(new_main)
+        new_alt_node = nodes_hash_ring.hash_ring.get_node(key)
+        nodes_hash_ring.hash_ring.add_node(new_main)
+        nodes_hash_ring.hash_ring.add_node(new_alt_node)
+        node = new_main
+        alt_node = new_alt_node
+
     try:
         ans = ec2_node.store_data_and_post_req(key, data, expiration_date, node)
         ec2_node.secondary_node = node
