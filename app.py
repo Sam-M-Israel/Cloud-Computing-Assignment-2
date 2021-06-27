@@ -181,9 +181,10 @@ def update_health_table():
 @app.route('/health-check', methods=['GET', 'POST'])
 def health_check():
     time_stamp = update_health_table()
-    print(f'{ip_address} node still alive at {time_stamp}')
-    nodes_hash_ring.update_live_nodes()
-    if nodes_hash_ring.do_backup is True and not ec2_node.has_been_backed_up:
+    do_backup = nodes_hash_ring.update_live_nodes()
+    print(f'Here in Health Check: {ip_address} node still alive at {time_stamp}')
+    if do_backup is True and not ec2_node.has_been_backed_up:
+        print("Got into do backup section")
         node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips("fake_Key")
         ec2_node.secondary_node = node if node not in nodes_hash_ring.live_nodes else alt_node
         ec2_node.backup_main_cache(ec2_node.ip)
