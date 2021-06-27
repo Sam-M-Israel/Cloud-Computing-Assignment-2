@@ -58,9 +58,6 @@ class Ec2Node:
         has_been_cached = self.store_data(key, data, expiration_date)
         if has_been_cached:
             res = self.post_to_target_node(key, data, expiration_date, target_node_ip)
-        else:
-            res = json.dumps({'status_code': 404,
-                              "error": f"Error storing {key} in THIS node's cache"})
 
         return res
 
@@ -73,11 +70,9 @@ class Ec2Node:
         """
         data_from_cache = self.get_data_in_cache(key)
         if data_from_cache is None:
-            res = self.get_from_target_node(key, target_node_ip)
-        else:
-            res = json.dumps({'status_code': 404,
-                              "error": f"Error getting {key} in THIS node's cache"})
-        return res
+            data_from_cache = self.get_from_target_node(key, target_node_ip)
+
+        return data_from_cache
 
     def store_data(self, key, data, expiration_date):
         return self._cache.put(key, data, expiration_date)
