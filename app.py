@@ -69,7 +69,7 @@ def get():
         return json.dumps({'status_code': 200,
                           'Invalid Key': f'Key, value pair for {key} doesn\"t exist in '
                                         'any cache in system'})
-    return ans.json().get('item')
+    return ans
 
 
 @app.route('/put', methods=['GET', 'POST'])

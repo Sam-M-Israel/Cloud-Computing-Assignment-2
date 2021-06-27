@@ -27,7 +27,7 @@ class Ec2Node:
         try:
             res = requests.post(
                     f'http://{target_node_ip}:{self._vpc_port}/api/set_value?str_key={key}&data={data}&expiration_date={expiration_date}')
-            res = json.dumps({'status_code': 200, "item": res})
+            # res = json.dumps({'status_code': 200, "item": res})
         except requests.exceptions.ConnectionError:
             res = json.dumps({'status_code': 404})
         return res
@@ -41,7 +41,7 @@ class Ec2Node:
         """
         try:
             res = requests.get(f'http://{target_node_ip}:{self._vpc_port}/api/get_value?str_key={key}')
-            res = json.dumps({'status_code': 200, "item": res})
+            # res = json.dumps({'status_code': 200, "item": res})
         except requests.exceptions.ConnectionError:
             res = json.dumps({'status_code': 404})
         return res
