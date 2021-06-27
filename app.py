@@ -144,6 +144,7 @@ def backup_node():
     try:
         data_to_backup = request.get_json(silent=True)
         print(data_to_backup)
+        data_to_backup = json.loads(data_to_backup)
         start_node = request.args.get('start_node')
         backup_res = ec2_node.backup_neighbors_cache(data_to_backup)
         if start_node == ec2_node.ip:

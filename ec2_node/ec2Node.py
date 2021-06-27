@@ -92,7 +92,7 @@ class Ec2Node:
             full_cache = self.cache.get_full_cache()
             data = {}
             if full_cache != {}:
-                data = jsonify(full_cache)
+                data = json.dumps(full_cache)
 
             res = requests.post(
                 f'http://{self.secondary_node}:'
@@ -106,4 +106,4 @@ class Ec2Node:
     def backup_neighbors_cache(self, new_cache):
         self.backup_cache._cache = new_cache
 
-        return "Data is backed up"
+        return json.dumps({'status_code': 200})
