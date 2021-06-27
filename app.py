@@ -125,7 +125,7 @@ def show_cache():
     """
     try:
         data = json.dumps(
-            {'status code': 200, 'item': ec2_node.get_cache()})
+            {'status code': 200, 'item': ec2_node.get_full_cache()})
     except Exception as e:
         data = json.dumps(
             {'status code': 400, 'item': f"Error: {e}"})
@@ -143,19 +143,22 @@ def get_live_nodes():
 def backup_node():
     try:
         data_to_backup = request.get_json(silent=True)
-        print(data_to_backup)
+        print(f"Here in backup_node : {data_to_backup}")
         data_to_backup = json.loads(data_to_backup)
         start_node = request.args.get('start_node')
+        num_nodes_left_to_backup = int(request.args.get('nodes_to_backup'))
         backup_res = ec2_node.backup_neighbors_cache(data_to_backup)
-        if start_node == ec2_node.ip:
-            print("Backups done")
+        res = "DONE!!!!!"
+        if start_node == ec2_node.ip or num_nodes_left_to_backup == 0:
+            #TODO: Add a way to send stop reqs to all live nodes
+            ec2_node.has_been_backed_up = False
         else:
             if not ec2_node.has_been_backed_up:
+                num_nodes_left_to_backup -= 1
                 nodes_hash_ring.update_live_nodes()
                 node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips("fake_Key")
                 ec2_node.secondary_node = node if node not in nodes_hash_ring.live_nodes else alt_node
-                ec2_node.backup_main_cache(ec2_node.ip)
-                backup_res = ec2_node.backup_main_cache(start_node)
+                backup_res = ec2_node.backup_main_cache(start_node, num_nodes_left_to_backup)
             res = json.dumps({'status code': 200, 'item': backup_res})
             update_health_table()
             ec2_node.has_been_backed_up = True
@@ -185,10 +188,11 @@ def health_check():
     do_backup = nodes_hash_ring.update_live_nodes()
     print(f'Here in Health Check: {ip_address} node still alive at {time_stamp}')
     if do_backup is True and not ec2_node.has_been_backed_up:
+        ## Add something to ping the other nodes to hault their backups
         print("Got into do backup section")
         node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips("fake_Key")
         ec2_node.secondary_node = node if node not in nodes_hash_ring.live_nodes else alt_node
-        ec2_node.backup_main_cache(ec2_node.ip)
+        ec2_node.backup_main_cache(ec2_node.ip, nodes_hash_ring.num_live_nodes + 1)
         ec2_node.has_been_backed_up = True
     return "200"
 

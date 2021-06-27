@@ -33,7 +33,7 @@ class Ec2Node:
         """
         try:
             res = requests.post(
-                    f'http://{target_node_ip}:{self._vpc_port}/api/set_value?str_key={key}&data={data}&expiration_date={expiration_date}')
+                f'http://{target_node_ip}:{self._vpc_port}/api/set_value?str_key={key}&data={data}&expiration_date={expiration_date}')
             # res = json.dumps({'status_code': 200, "item": res})
         except requests.exceptions.ConnectionError:
             res = json.dumps({'status_code': 404})
@@ -47,7 +47,8 @@ class Ec2Node:
         :return:
         """
         try:
-            res = requests.get(f'http://{target_node_ip}:{self._vpc_port}/api/get_value?str_key={key}')
+            res = requests.get(
+                f'http://{target_node_ip}:{self._vpc_port}/api/get_value?str_key={key}')
         except requests.exceptions.ConnectionError:
             res = json.dumps({'status_code': 404})
         return res
@@ -84,21 +85,28 @@ class Ec2Node:
     def get_data_in_cache(self, key):
         return self.cache.get(key)
 
-    def get_cache(self):
+    def get_full_cache(self):
+        return {"cache": self.get_main_cache(),
+                "back_up_cache": self.get_backup_cache()}
+
+    def get_main_cache(self):
         return self.cache.get_full_cache()
 
-    def backup_main_cache(self, start_node_ip):
+    def get_backup_cache(self):
+        return self.backup_cache.get_full_cache()
+
+    def backup_main_cache(self, start_node_ip, num_nodes_in_ring):
         try:
             full_cache = self.cache.get_full_cache()
             data = {}
             if full_cache != {}:
                 data = json.dumps(full_cache)
-
             res = requests.post(
                 f'http://{self.secondary_node}:'
-                f'{self._vpc_port}/api/backup?start_node={start_node_ip}', json={data})
-
-            print(res)
+                f'{self._vpc_port}/api/backup?start_node='
+                f'{start_node_ip}&nodes_to_backup={num_nodes_in_ring}',
+                json=data)
+            res = json.load()
         except requests.exceptions.ConnectionError:
             res = json.dumps({'status_code': 404})
         return res
