@@ -6,11 +6,13 @@ class NodeHashRing:
     """
     Our Hash ring object
     """
-    def __init__(self, db_table, logger):
+    def __init__(self, db_table):
         self.dynamo_table = db_table
-        self.live_nodes = self.get_live_node_list()
+        self.num_live_nodes = 0
+        self.prev_num_live_nodes = 0
+        self.live_nodes, self.do_backup = self.get_live_node_list()
+        self.change_in_num_nodes = False
         self.hash_ring = HashRing(nodes=self.live_nodes)
-        # self.flask_logger = logger
         self._last_updated = 0
         self.get_current_time()
 
@@ -19,17 +21,28 @@ class NodeHashRing:
         Set value in our node's cache
         :return:
         """
+        do_backup = False
         try:
-            print('Here in get_live_node_list')
             response = self.dynamo_table.scan()
-            print(f'Table scan response: {response}')
             self.get_current_time()
             self.live_nodes = [item['IP'] for item in response['Items'] if
                           float(item['lastActiveTime']) >= self._last_updated - 60000]
+
+            if self.num_difference_in_nodes() > 0:
+                self.set_num_live_and_prev_nodes(len(self.live_nodes))
+                do_backup = True
+
         except Exception as e:
             print(f'Error in get_live_node_list: {e}')
 
-        return self.live_nodes
+        return self.live_nodes, do_backup
+
+    def set_num_live_and_prev_nodes(self, new_num_nodes):
+        self.prev_num_live_nodes = self.num_live_nodes
+        self.num_live_nodes = new_num_nodes
+
+    def num_difference_in_nodes(self):
+        return abs(self.num_live_nodes - self.prev_num_live_nodes)
 
     def get_target_node(self, key):
         return self.hash_ring.get_node(key)
@@ -49,7 +62,7 @@ class NodeHashRing:
         return main_node, alt_node
 
     def update_live_nodes(self):
-        live_nodes_list = self.get_live_node_list()
+        live_nodes_list, _ = self.get_live_node_list()
 
         for node in live_nodes_list:
             if node not in self.hash_ring.get_nodes():

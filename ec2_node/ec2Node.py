@@ -1,7 +1,11 @@
+import boto3
 import requests
 import json
 import requests
 import json
+
+from flask import jsonify
+
 from ec2_node.nodeCache import NodeCache
 
 
@@ -13,7 +17,9 @@ class Ec2Node:
     def __init__(self, vpc_port):
         self._vpc_port = vpc_port
         self.ip = ""
-        self._cache = NodeCache()
+        self.cache = NodeCache()
+        self.backup_cache = NodeCache(True)
+        self.secondary_node = ""
 
     def post_to_target_node(self, key, data, expiration_date, target_node_ip):
         """
@@ -41,7 +47,6 @@ class Ec2Node:
         """
         try:
             res = requests.get(f'http://{target_node_ip}:{self._vpc_port}/api/get_value?str_key={key}')
-            # res = json.dumps({'status_code': 200, "item": res})
         except requests.exceptions.ConnectionError:
             res = json.dumps({'status_code': 404})
         return res
@@ -58,7 +63,6 @@ class Ec2Node:
         has_been_cached = self.store_data(key, data, expiration_date)
         if has_been_cached:
             res = self.post_to_target_node(key, data, expiration_date, target_node_ip)
-
         return res
 
     def get_data_and_get_req(self, key, target_node_ip):
@@ -71,14 +75,30 @@ class Ec2Node:
         data_from_cache = self.get_data_in_cache(key)
         if data_from_cache is None:
             data_from_cache = self.get_from_target_node(key, target_node_ip)
-
         return data_from_cache
 
     def store_data(self, key, data, expiration_date):
-        return self._cache.put(key, data, expiration_date)
+        return self.cache.put(key, data, expiration_date)
 
     def get_data_in_cache(self, key):
-        return self._cache.get(key)
+        return self.cache.get(key)
 
     def get_cache(self):
-        return self._cache.get_full_cache()
+        return self.cache.get_full_cache()
+
+    def backup_main_cache(self, start_node_ip):
+        try:
+            data = jsonify(self.cache.get_full_cache())
+            res = requests.post(
+                f'http://{self.secondary_node}:'
+                f'{self._vpc_port}/api/backup?start_node={start_node_ip}', json={data})
+
+            print(res)
+        except requests.exceptions.ConnectionError:
+            res = json.dumps({'status_code': 404})
+        return res
+
+    def backup_neighbors_cache(self, new_cache):
+        self.backup_cache._cache = new_cache
+
+        return "Data is backed up"

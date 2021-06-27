@@ -3,35 +3,15 @@ import json
 from datetime import datetime
 import requests
 import boto3
-from uhashring import HashRing
 from ec2_node.ec2Node import Ec2Node
 from ec2_node.nodeHashRing import NodeHashRing
 
 ec2_node = Ec2Node(8080)
 
-
-def get_live_node_list() -> []:
-    live_nodes = []
-    try:
-        app.logger.info('get_live_node_list')
-        now = get_current_time()
-        response = table.scan()
-        app.logger.info(f'Table scan response: {response}')
-        live_nodes = [item['IP'] for item in response['Items'] if
-                      float(item['lastActiveTime']) >= now - 60000]
-        print(live_nodes)
-    except Exception as e:
-        app.logger.info(f'Error in get_live_node_list: {e}')
-
-    return live_nodes
-
-
 dynamodb = boto3.resource('dynamodb', region_name="us-east-2")
 table = dynamodb.Table('ActiveNodes')
 app = Flask(__name__)
-nodes_hash_ring = NodeHashRing(table, app.logger)
-# nodes_hash_ring = HashRing(nodes=get_live_node_list())
-
+nodes_hash_ring = NodeHashRing(table)
 
 # TODO:
 # Routes:
@@ -58,9 +38,11 @@ def get():
     node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips(key)
     try:
         ans = ec2_node.get_data_and_get_req(key, node)
+        ec2_node.secondary_node = node
     except requests.exceptions.ConnectionError:
         try:
             ans = ec2_node.get_data_and_get_req(key, alt_node)
+            ec2_node.secondary_node = alt_node
         except requests.exceptions.ConnectionError:
             ans = json.dumps({'status_code': 404})
     update_health_table()
@@ -85,9 +67,11 @@ def put():
     node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips(key)
     try:
         ans = ec2_node.store_data_and_post_req(key, data, expiration_date, node)
+        ec2_node.secondary_node = node
     except requests.exceptions.ConnectionError:
         try:
             ans = ec2_node.store_data_and_post_req(key, data, expiration_date, alt_node)
+            ec2_node.secondary_node = alt_node
         except requests.exceptions.ConnectionError:
             ans = json.dumps({'status_code': 404})
     update_health_table()
@@ -149,9 +133,27 @@ def show_cache():
 
 @app.route('/api/show_me_the_living', methods=['GET','POST'])
 def get_live_nodes():
-    live_nodes_list = nodes_hash_ring.get_live_node_list()
+    live_nodes_list, _ = nodes_hash_ring.get_live_node_list()
     return json.dumps(
             {'status code': 200, 'item': live_nodes_list})
+
+
+@app.route('/api/backup', methods=['GET','POST'])
+def backup_node():
+    try:
+        data_to_backup = request.get_json(silent=True)
+        print(data_to_backup)
+        start_node = request.args.get('start_node')
+        backup_res = ec2_node.backup_neighbors_cache(data_to_backup)
+        if start_node == ec2_node.ip:
+            print("Backups done")
+        else:
+            backup_res = ec2_node.backup_main_cache(start_node)
+            res = json.dumps({'status code': 200, 'item': backup_res})
+            update_health_table()
+    except Exception as e:
+        res = json.dumps({'status code': 400, 'item': f"Error: {e}"})
+    return res
 
 
 def update_health_table():
@@ -169,40 +171,14 @@ def update_health_table():
     return timestamp
 
 
-# def get_target_node(key, nodes):
-#     hr = HashRing(nodes=nodes)
-#     return hr.get_node(key)
-#
-#
-# def update_live_nodes():
-#     live_nodes_list = get_live_node_list()
-#     remove_list = []
-#
-#     for node in live_nodes_list:
-#         if node not in nodes_hash_ring.get_nodes():
-#             nodes_hash_ring.add_node(node)
-#
-#     for node_key in nodes_hash_ring.get_nodes():
-#         if node_key not in live_nodes_list:
-#             remove_list.append(node_key)
-#
-#     for node_key in remove_list:
-#         nodes_hash_ring.remove_node(node_key)
-#
-#
-# def get_target_and_alt_node_ips(key):
-#     update_live_nodes()
-#     main_node = nodes_hash_ring.get_node(key)
-#     nodes_hash_ring.remove_node(main_node)
-#     alt_node = nodes_hash_ring.get_node(key)
-#     nodes_hash_ring.add_node(main_node)
-#     return main_node, alt_node
-
-
 @app.route('/health-check', methods=['GET', 'POST'])
 def health_check():
     time_stamp = update_health_table()
     print(f'{ip_address} node still alive at {time_stamp}')
+    nodes_hash_ring.update_live_nodes()
+    if nodes_hash_ring.do_backup is True:
+        node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips()
+        ec2_node.backup_main_cache()
     return "200"
 
 

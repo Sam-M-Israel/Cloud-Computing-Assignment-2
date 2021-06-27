@@ -7,9 +7,11 @@ class NodeCache:
     Our EC2 nodes cache class object. This will hold all of our node's relevant data and allow us to easily
     execute operations on it
     """
-    def __init__(self):
+    def __init__(self, is_backup=False):
         self._cache = {}
+        self._is_backup = is_backup
         self._last_updated = 0
+        self.has_been_backed_up = False
         self.update_time()
 
     def put(self, key, data, expiration_date):
