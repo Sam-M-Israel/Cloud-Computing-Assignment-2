@@ -19,6 +19,7 @@ class Ec2Node:
         self.ip = ""
         self.cache = NodeCache()
         self.backup_cache = NodeCache(True)
+        self.has_been_backed_up = False
         self.secondary_node = ""
 
     def post_to_target_node(self, key, data, expiration_date, target_node_ip):

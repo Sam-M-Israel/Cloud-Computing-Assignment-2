@@ -148,9 +148,15 @@ def backup_node():
         if start_node == ec2_node.ip:
             print("Backups done")
         else:
-            backup_res = ec2_node.backup_main_cache(start_node)
+            if not ec2_node.has_been_backed_up:
+                nodes_hash_ring.update_live_nodes()
+                node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips("fake_Key")
+                ec2_node.secondary_node = node if node not in nodes_hash_ring.live_nodes else alt_node
+                ec2_node.backup_main_cache(ec2_node.ip)
+                backup_res = ec2_node.backup_main_cache(start_node)
             res = json.dumps({'status code': 200, 'item': backup_res})
             update_health_table()
+            ec2_node.has_been_backed_up = True
     except Exception as e:
         res = json.dumps({'status code': 400, 'item': f"Error: {e}"})
     return res
@@ -176,10 +182,11 @@ def health_check():
     time_stamp = update_health_table()
     print(f'{ip_address} node still alive at {time_stamp}')
     nodes_hash_ring.update_live_nodes()
-    if nodes_hash_ring.do_backup is True:
+    if nodes_hash_ring.do_backup is True and not ec2_node.has_been_backed_up:
         node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips("fake_Key")
         ec2_node.secondary_node = node if node not in nodes_hash_ring.live_nodes else alt_node
         ec2_node.backup_main_cache(ec2_node.ip)
+        ec2_node.has_been_backed_up = True
     return "200"
 
 
