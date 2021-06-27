@@ -95,12 +95,12 @@ def put():
 @app.route('/api/get_val', methods=['GET'])
 def get_value():
     """
-    Get the value of the given key from THIS nodes cache
+    Get the value of the given key from THIS nodes backup cache of the sender node
     :return: the data value of the given key from the cache
     """
     try:
         key = request.args.get('str_key')
-        item = ec2_node.get_data_in_cache(key)
+        item = ec2_node.get_data_from_backup(key)
         res = json.dumps({'status code': 200, 'item': item})
         update_health_table()
     except Exception as e:
@@ -112,14 +112,14 @@ def get_value():
 @app.route('/api/set_value', methods=['POST'])
 def set_value():
     """
-    Sets a key in THIS nodes cache with the data value
+    Sets a key in THIS nodes backup cache for the sender with the data value
     :return: Status code
     """
     try:
         key = request.args.get('str_key')
         data = request.args.get('data')
         expiration_date = request.args.get('expiration_date')
-        store_res = ec2_node.store_data(key, data, expiration_date)
+        store_res = ec2_node.store_data_in_backup(key, data, expiration_date)
         res = json.dumps({'status code': 200, 'item': store_res})
         update_health_table()
     except Exception as e:

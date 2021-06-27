@@ -62,7 +62,7 @@ class Ec2Node:
         :param target_node_ip:
         :return:
         """
-        has_been_cached = self.store_data(key, data, expiration_date)
+        has_been_cached = self.store_data_in_cache(key, data, expiration_date)
         if has_been_cached:
             res = self.post_to_target_node(key, data, expiration_date, target_node_ip)
         return res
@@ -74,16 +74,22 @@ class Ec2Node:
         :param target_node_ip:
         :return:
         """
-        data_from_cache = self.get_data_in_cache(key)
+        data_from_cache = self.store_data_in_cache(key)
         if data_from_cache is None:
             data_from_cache = self.get_from_target_node(key, target_node_ip)
         return data_from_cache
 
-    def store_data(self, key, data, expiration_date):
+    def store_data_in_cache(self, key, data, expiration_date):
         return self.cache.put(key, data, expiration_date)
 
-    def get_data_in_cache(self, key):
+    def store_data_in_backup(self, key, data, expiration_date):
+        return self.backup_cache.put(key, data, expiration_date)
+
+    def get_data_from_cache(self, key):
         return self.cache.get(key)
+
+    def get_data_from_backup(self, key):
+        return self.backup_cache.get(key)
 
     def get_full_cache(self):
         return {"cache": self.get_main_cache(),
