@@ -208,7 +208,7 @@ def health_check():
     #     ec2_node.backup_main_cache(ec2_node.ip, nodes_hash_ring.num_live_nodes + 1)
     #     ec2_node.has_been_backed_up = True
     node_health_check()
-    return "200"
+    return json.dumps({'status code': 200, 'timestamp': time_stamp})
 
 
 def node_health_check():
@@ -244,7 +244,21 @@ def update_hash_ring_nodes_with_data(current_live_nodes, new_num_live_nodes):
                 except requests.exceptions.ConnectionError:
                     continue
 
-        live_nodes_pool = new_num_live_nodes
+    live_nodes_pool = new_num_live_nodes
+
+
+@app.route('/api/get_var')
+def get_var():
+    local_vars = locals()
+    global_vars = globals()
+    try:
+        key = request.args.get('var_key')
+        local_value = local_vars.get(key)
+        global_value = global_vars.get(key)
+        res = [global_value, local_value]
+    except Exception as e:
+        res = f"Did not give a valid local/global variable, please try again"
+    return json.dumps({'status code': 200, 'item': res})
 
 
 @app.route('/')
