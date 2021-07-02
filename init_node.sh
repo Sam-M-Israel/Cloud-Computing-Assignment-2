@@ -13,4 +13,4 @@ cd Cloud-Computing-Assignment-2
 pip3 install -r requirements.txt && pip3 freeze > requirements.txt
 export FLASK_APP=app.py && export FLASK_ENV=production && export FLASK_DEBUG=0
 echo "Starting flask server, you can access this instances EC2 public IP, port 8080"
-nohup flask run --host 0.0.0.0 >/dev/null & exit
+nohup flask run --host 0.0.0.0 --port=8080 >/dev/null & exit

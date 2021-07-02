@@ -213,9 +213,17 @@ def update_hash_ring_nodes_with_data(current_live_nodes, new_num_live_nodes):
     live_nodes_pool = new_num_live_nodes
 
 
-if __name__ == '__main__':
+@app.before_first_request
+def setup():
+    global ip_address
     ip_address = requests.get('https://api.ipify.org').text
     ec2_node.ip = ip_address
     update_health_table()
     app.logger.info(f'My public IP address is: {ip_address}')
+
+
+if __name__ == '__main__':
+    setup()
     app.run(host='0.0.0.0', port=8080)
+
+
