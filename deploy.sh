@@ -39,6 +39,7 @@ echo "Creating cloud formation stack "
 STACK_NAME="sam-omer-stack"
 STACK_RESULT=$(aws cloudformation create-stack --stack-name $STACK_NAME --template-body file://cloudFormationEc2.json --capabilities CAPABILITY_IAM \
           --parameters ParameterKey=InstanceType,ParameterValue=t2.micro \
+          ParameterKey=UserData,ParameterValue=$(base64 -w0 init_node.sh)\
           ParameterKey=KeyName,ParameterValue=$KEY_NAME \
 	        ParameterKey=SSHLocation,ParameterValue=$MY_IP/32 \
           ParameterKey=SubnetID1,ParameterValue=$SUBNET_ID_1 \
@@ -91,43 +92,4 @@ echo "Getting DNS Name for ELB: $ELB_NAME"
 DNS_ADD=$(aws elbv2 describe-load-balancers --names $ELB_NAME | jq -r .LoadBalancers[0].DNSName)
 echo "$DNS_ADD"
 
-#echo "setup rule allowing SSH access to $MY_IP only"
-#aws ec2 authorize-security-group-ingress        \
-#    --group-name $SEC_GRP --port 22 --protocol tcp \
-#    --cidr $MY_IP/32
-#
-#echo "setup rule allowing HTTP (port 5000) access to $MY_IP only"
-#aws ec2 authorize-security-group-ingress        \
-#    --group-name $SEC_GRP --port 5000 --protocol tcp \
-#    --cidr $MY_IP/32
-#
-#UBUNTU_20_04_AMI="ami-08962a4068733a2b6"
-#
-#echo "Creating Ubuntu 20.04 instance..."
-#RUN_INSTANCES=$(aws ec2 run-instances   \
-#    --image-id $UBUNTU_20_04_AMI        \
-#    --instance-type t2.micro            \
-#    --key-name $KEY_NAME                \
-#    --security-groups $SEC_GRP)
-#
-#INSTANCE_ID=$(echo $RUN_INSTANCES | jq -r '.Instances[0].InstanceId')
-#
-#echo "Waiting for instance creation..."
-#aws ec2 wait instance-running --instance-ids $INSTANCE_ID
-#
-#PUBLIC_IP=$(aws ec2 describe-instances  --instance-ids $INSTANCE_ID |
-#    jq -r '.Reservations[0].Instances[0].PublicIpAddress'
-#)
-#
-#echo "New instance $INSTANCE_ID @ $PUBLIC_IP"
-#echo "deploying code to production"
-#scp -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=60" launch_script.sh ubuntu@$PUBLIC_IP:/home/ubuntu/
-#
-#echo "setup production environment"
-#ssh -i $KEY_PEM -o "StrictHostKeyChecking=no" -o "ConnectionAttempts=10" ubuntu@$PUBLIC_IP <<EOF
-#  sh -e launch_script.sh
-#EOF
-#
-#echo "test that it all worked"
-#curl  --retry-connrefused --retry 10 --retry-delay 1  http://$PUBLIC_IP:5000
 
