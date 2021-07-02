@@ -39,7 +39,7 @@ echo "Creating cloud formation stack "
 STACK_NAME="sam-omer-stack"
 STACK_RESULT=$(aws cloudformation create-stack --stack-name $STACK_NAME --template-body file://cloudFormationEc2.json --capabilities CAPABILITY_IAM \
           --parameters ParameterKey=InstanceType,ParameterValue=t2.micro \
-          ParameterKey=UserData,ParameterValue=$(base64 -w0 init_node.sh)\
+          ParameterKey=UserData,ParameterValue=$(base64 init_node.sh)\
           ParameterKey=KeyName,ParameterValue=$KEY_NAME \
 	        ParameterKey=SSHLocation,ParameterValue=$MY_IP/32 \
           ParameterKey=SubnetID1,ParameterValue=$SUBNET_ID_1 \
