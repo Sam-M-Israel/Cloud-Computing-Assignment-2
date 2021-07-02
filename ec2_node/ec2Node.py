@@ -104,11 +104,11 @@ class Ec2Node:
         """
         primary_cache = self.get_main_cache()
         backup_cache = self.get_backup_cache()
-        for key_prime, val_prime in primary_cache:
+        for key_prime, val_prime in primary_cache.items():
             if key_prime in backup_cache:
                 val_in_backup_cache = backup_cache.get(key_prime)
                 if val_prime == val_in_backup_cache:
-                    self.backup_cache.pop_item(val_prime)
+                    self.backup_cache.pop_item(key_prime)
 
 
 
