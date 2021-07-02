@@ -83,6 +83,12 @@ class NodeHashRing:
 
         return do_backup
 
+    def update_hash_ring(self, current_live_nodes):
+        self.live_nodes = current_live_nodes
+        self.num_live_nodes = len(current_live_nodes)
+        self.hash_ring = HashRing(nodes=self.live_nodes)
+
+
     def get_current_time(self):
         self._last_updated = int(round(datetime.now().timestamp()) * 1000)
         return self._last_updated

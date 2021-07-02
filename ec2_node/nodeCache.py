@@ -56,5 +56,8 @@ class NodeCache:
         self.update_time()
         return self._cache
 
+    def pop_item(self, key):
+        return self._cache.pop(key)
+
     def update_time(self):
         self._last_updated = round(datetime.now().timestamp())

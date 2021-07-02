@@ -3,6 +3,8 @@ import json
 from datetime import datetime
 import requests
 import boto3
+from uhashring import HashRing
+
 from ec2_node.ec2Node import Ec2Node
 from ec2_node.nodeHashRing import NodeHashRing
 
@@ -12,7 +14,7 @@ dynamodb = boto3.resource('dynamodb', region_name="us-east-2")
 table = dynamodb.Table('ActiveNodes')
 app = Flask(__name__)
 nodes_hash_ring = NodeHashRing(table)
-
+live_nodes_pool = 1
 # TODO:
 # Routes:
 # 1. Health Check
@@ -194,17 +196,54 @@ def update_health_table():
 
 @app.route('/health-check', methods=['GET', 'POST'])
 def health_check():
+
     time_stamp = update_health_table()
-    do_backup = nodes_hash_ring.update_live_nodes()
+    # do_backup = nodes_hash_ring.update_live_nodes()
     print(f'Here in Health Check: {ip_address} node still alive at {time_stamp}')
-    if do_backup is True and not ec2_node.has_been_backed_up:
-        ## Add something to ping the other nodes to hault their backups
-        print("Got into do backup section")
-        node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips("fake_Key")
-        ec2_node.secondary_node = node if node not in nodes_hash_ring.live_nodes else alt_node
-        ec2_node.backup_main_cache(ec2_node.ip, nodes_hash_ring.num_live_nodes + 1)
-        ec2_node.has_been_backed_up = True
+    # if do_backup is True and not ec2_node.has_been_backed_up:
+    #     ## Add something to ping the other nodes to hault their backups
+    #     print("Got into do backup section")
+    #     node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips("fake_Key")
+    #     ec2_node.secondary_node = node if node not in nodes_hash_ring.live_nodes else alt_node
+    #     ec2_node.backup_main_cache(ec2_node.ip, nodes_hash_ring.num_live_nodes + 1)
+    #     ec2_node.has_been_backed_up = True
+    node_health_check()
     return "200"
+
+
+def node_health_check():
+    print("Here in node_health_check")
+    current_live_nodes, _ = nodes_hash_ring.get_live_node_list()
+    num_current_live_nodes = len(current_live_nodes)
+    if num_current_live_nodes != live_nodes_pool:
+        update_hash_ring_nodes_with_data(current_live_nodes, num_current_live_nodes)
+
+
+def update_hash_ring_nodes_with_data(current_live_nodes, new_num_live_nodes):
+    print("Here in update_hash_ring_nodes_with_data")
+    global live_nodes_pool
+    nodes_hash_ring.update_hash_ring(current_live_nodes)
+    node_cache = ec2_node.cache.get_full_cache()
+    for key in node_cache:
+        new_main_node, new_alt_node = nodes_hash_ring.get_target_and_alt_node_ips(key)
+
+        if (ec2_node.secondary_node != new_main_node) or \
+            (ec2_node.secondary_node != new_alt_node):
+            date_from_key = ec2_node.cache.pop_item(key)
+            print(date_from_key)
+            data, expiration_date = date_from_key[key]
+            try:
+                ec2_node.store_data_and_post_req(key, data, expiration_date, new_main_node)
+                ec2_node.secondary_node = new_main_node
+            except requests.exceptions.ConnectionError:
+                try:
+                    ec2_node.store_data_and_post_req(key, data, expiration_date,
+                                                     new_alt_node)
+                    ec2_node.secondary_node = new_alt_node
+                except requests.exceptions.ConnectionError:
+                    continue
+
+        live_nodes_pool = new_num_live_nodes
 
 
 @app.route('/')
