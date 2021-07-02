@@ -8,7 +8,7 @@ class NodeCache:
     execute operations on it
     """
     def __init__(self, is_backup=False):
-        self._cache = {}
+        self._cache = dict()
         self._is_backup = is_backup
         self._last_updated = 0
         self.has_been_backed_up = False
