@@ -212,9 +212,9 @@ def health_check():
 
 
 def node_health_check():
-    print("Here in node_health_check")
     current_live_nodes, _ = nodes_hash_ring.get_live_node_list()
     num_current_live_nodes = len(current_live_nodes)
+    print(f"Here in node_health_check. Current live nodes=> {current_live_nodes}")
     if num_current_live_nodes != live_nodes_pool:
         update_hash_ring_nodes_with_data(current_live_nodes, num_current_live_nodes)
 
@@ -230,8 +230,9 @@ def update_hash_ring_nodes_with_data(current_live_nodes, new_num_live_nodes):
         if (ec2_node.secondary_node != new_main_node) or \
             (ec2_node.secondary_node != new_alt_node):
             date_from_key = ec2_node.cache.pop_item(key)
-            print(date_from_key)
-            data, expiration_date = date_from_key[key]
+            print(f"Printing cache data: {date_from_key}")
+            data = date_from_key["data"]
+            expiration_date = date_from_key["expiration_date"]
             try:
                 ec2_node.store_data_and_post_req(key, data, expiration_date, new_main_node)
                 ec2_node.secondary_node = new_main_node
