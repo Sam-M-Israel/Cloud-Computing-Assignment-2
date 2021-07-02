@@ -223,7 +223,7 @@ def update_hash_ring_nodes_with_data(current_live_nodes, new_num_live_nodes):
     print("Here in update_hash_ring_nodes_with_data")
     global live_nodes_pool
     nodes_hash_ring.update_hash_ring(current_live_nodes)
-    node_cache = ec2_node.cache.get_full_cache()
+    node_cache = ec2_node.cache.get_full_cache().copy()
     for key in node_cache:
         new_main_node, new_alt_node = nodes_hash_ring.get_target_and_alt_node_ips(key)
 
