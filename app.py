@@ -160,19 +160,21 @@ def update_health_table():
 
 @app.route('/health-check', methods=['GET', 'POST'])
 def health_check():
-
     time_stamp = update_health_table()
-    # do_backup = nodes_hash_ring.update_live_nodes()
     print(f'Here in Health Check: {ip_address} node still alive at {time_stamp}')
-    # if do_backup is True and not ec2_node.has_been_backed_up:
-    #     ## Add something to ping the other nodes to hault their backups
-    #     print("Got into do backup section")
-    #     node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips("fake_Key")
-    #     ec2_node.secondary_node = node if node not in nodes_hash_ring.live_nodes else alt_node
-    #     ec2_node.backup_main_cache(ec2_node.ip, nodes_hash_ring.num_live_nodes + 1)
-    #     ec2_node.has_been_backed_up = True
     node_health_check()
     return json.dumps({'status code': 200, 'timestamp': time_stamp})
+
+@app.route('/')
+def hello_world():
+    print(f'Here in hello world')
+    timestamp = get_current_time()
+    item = {'IP': ip_address,
+            'lastActiveTime': timestamp
+            }
+    table.put_item(Item=item)
+    nodes_hash_ring.update_live_nodes()
+    return 'Hello World!'
 
 
 def node_health_check():
@@ -209,32 +211,6 @@ def update_hash_ring_nodes_with_data(current_live_nodes, new_num_live_nodes):
                     continue
 
     live_nodes_pool = new_num_live_nodes
-
-
-@app.route('/api/get_var')
-def get_var():
-    local_vars = locals()
-    global_vars = globals()
-    try:
-        key = request.args.get('var_key')
-        local_value = local_vars.get(key)
-        global_value = global_vars.get(key)
-        res = [global_value, local_value]
-    except Exception as e:
-        res = f"Did not give a valid local/global variable, please try again"
-    return json.dumps({'status code': 200, 'item': res})
-
-
-@app.route('/')
-def hello_world():
-    print(f'Here in hello world')
-    timestamp = get_current_time()
-    item = {'IP': ip_address,
-            'lastActiveTime': timestamp
-            }
-    table.put_item(Item=item)
-    nodes_hash_ring.update_live_nodes()
-    return 'Hello World!'
 
 
 if __name__ == '__main__':

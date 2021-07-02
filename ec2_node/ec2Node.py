@@ -1,10 +1,5 @@
-import boto3
 import requests
 import json
-import requests
-import json
-
-from flask import jsonify
 
 from ec2_node.nodeCache import NodeCache
 
@@ -19,7 +14,6 @@ class Ec2Node:
         self.ip = ""
         self.cache = NodeCache()
         self.backup_cache = NodeCache(True)
-        self.has_been_backed_up = False
         self.secondary_node = ""
 
     def post_to_target_node(self, key, data, expiration_date, target_node_ip):
@@ -103,7 +97,11 @@ class Ec2Node:
         return self.backup_cache.get_full_cache()
 
     def readjust_cache(self):
-        print("Here in readjust cache")
+        """
+        This method readjusts the cache's of THIS no so there aren't any duplicate
+        key,value pairs between the main cache and the backup cache
+        :return:
+        """
         primary_cache = self.get_main_cache()
         backup_cache = self.get_backup_cache()
         for key_prime, val_prime in primary_cache:
