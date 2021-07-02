@@ -3,7 +3,6 @@ import json
 from datetime import datetime
 import requests
 import boto3
-from uhashring import HashRing
 
 from ec2_node.ec2Node import Ec2Node
 from ec2_node.nodeHashRing import NodeHashRing
@@ -15,14 +14,6 @@ table = dynamodb.Table('ActiveNodes')
 app = Flask(__name__)
 nodes_hash_ring = NodeHashRing(table)
 live_nodes_pool = 1
-# TODO:
-# Routes:
-# 1. Health Check
-# 2. put (str_key, data, expiration_date)
-# 3. get(str_key) → null or data
-
-# Functions:
-# 1. Storing data in this nodes cache
 
 
 def get_current_time():
@@ -122,6 +113,7 @@ def set_value():
         data = request.args.get('data')
         expiration_date = request.args.get('expiration_date')
         store_res = ec2_node.store_data_in_backup(key, data, expiration_date)
+        ec2_node.readjust_cache()
         res = json.dumps({'status code': 200, 'item': store_res})
         update_health_table()
     except Exception as e:
@@ -149,34 +141,6 @@ def get_live_nodes():
     live_nodes_list, _ = nodes_hash_ring.get_live_node_list()
     return json.dumps(
             {'status code': 200, 'item': live_nodes_list})
-
-
-# @app.route('/api/backup', methods=['GET','POST'])
-# def backup_node():
-#     try:
-#         data_to_backup = request.get_json(silent=True)
-#         print(f"Here in backup_node : {data_to_backup}")
-#         data_to_backup = json.loads(data_to_backup)
-#         start_node = request.args.get('start_node')
-#         num_nodes_left_to_backup = int(request.args.get('nodes_to_backup'))
-#         backup_res = ec2_node.backup_neighbors_cache(data_to_backup)
-#         res = "DONE!!!!!"
-#         if start_node == ec2_node.ip or num_nodes_left_to_backup == 0:
-#             #TODO: Add a way to send stop reqs to all live nodes
-#             ec2_node.has_been_backed_up = False
-#         else:
-#             if not ec2_node.has_been_backed_up:
-#                 num_nodes_left_to_backup -= 1
-#                 nodes_hash_ring.update_live_nodes()
-#                 node, alt_node = nodes_hash_ring.get_target_and_alt_node_ips("fake_Key")
-#                 ec2_node.secondary_node = node if node not in nodes_hash_ring.live_nodes else alt_node
-#                 backup_res = ec2_node.backup_main_cache(start_node, num_nodes_left_to_backup)
-#             res = json.dumps({'status code': 200, 'item': backup_res})
-#             update_health_table()
-#             ec2_node.has_been_backed_up = True
-#     except Exception as e:
-#         res = json.dumps({'status code': 400, 'item': f"Error: {e}"})
-#     return res
 
 
 def update_health_table():

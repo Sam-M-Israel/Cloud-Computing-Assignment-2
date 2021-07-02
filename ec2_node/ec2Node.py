@@ -63,6 +63,7 @@ class Ec2Node:
         :return:
         """
         has_been_cached = self.store_data_in_cache(key, data, expiration_date)
+        self.readjust_cache()
         if has_been_cached:
             res = self.post_to_target_node(key, data, expiration_date, target_node_ip)
         return res
@@ -75,7 +76,6 @@ class Ec2Node:
         :return:
         """
         data_from_cache = self.store_data_in_cache(key)
-        self.readjust_cache()
         if data_from_cache is None:
             data_from_cache = self.get_from_target_node(key, target_node_ip)
         return data_from_cache
@@ -102,35 +102,15 @@ class Ec2Node:
     def get_backup_cache(self):
         return self.backup_cache.get_full_cache()
 
-    # def backup_main_cache(self, start_node_ip, num_nodes_in_ring):
-    #     try:
-    #         full_cache = self.cache.get_full_cache()
-    #         if full_cache != {}:
-    #             data = json.dumps(full_cache)
-    #             res = requests.post(
-    #                 f'http://{self.secondary_node}:'
-    #                 f'{self._vpc_port}/api/backup?start_node='
-    #                 f'{start_node_ip}&nodes_to_backup={num_nodes_in_ring}',
-    #                 json=data)
-    #             res = res.json()
-    #         else:
-    #             res = json.dumps({'status_code': 200, "item":"Backup cachce is empty"})
-    #     except requests.exceptions.ConnectionError:
-    #         res = json.dumps({'status_code': 404})
-    #     return res
-    #
-    # def backup_neighbors_cache(self, new_cache):
-    #     self.backup_cache._cache = new_cache
-    #     return json.dumps({'status_code': 200})
-
     def readjust_cache(self):
+        print("Here in readjust cache")
         primary_cache = self.get_main_cache()
         backup_cache = self.get_backup_cache()
         for key_prime, val_prime in primary_cache:
             if key_prime in backup_cache:
                 val_in_backup_cache = backup_cache.get(key_prime)
                 if val_prime == val_in_backup_cache:
-                    backup_cache.pop(val_prime)
+                    self.backup_cache.pop_item(val_prime)
 
 
 
